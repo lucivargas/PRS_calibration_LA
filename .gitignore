@@ -1,0 +1,25 @@
+# Ignore R data and history
+.Rhistory
+.RData
+.Rproj.user/
+
+# Ignore output, logs, and temporary files
+*.out
+*.log
+*.tmp
+*.slurm
+*.err
+
+# Ignore other scripts
+create_conda_environment.sh
+prscal_environment.yml
+prep_for_calibration.R
+join_calibration_results.R
+run_calibrate.sh
+
+# Ignore data directories
+1_format_reference/
+2_format_target_array/
+3_infer_local_ancestry/
+4_format_target_imputed/
+validations/
