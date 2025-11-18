@@ -125,6 +125,7 @@ fi
 ## Create directories to save output
 mkdir -p $OUTPUT_FOLDER/snp_lists
 mkdir -p $OUTPUT_FOLDER/gen
+mkdir -p $OUTPUT_FOLDER/gen/gwas
 mkdir -p $OUTPUT_FOLDER/gen/lai
 mkdir -p $OUTPUT_FOLDER/pgs
 mkdir -p $OUTPUT_FOLDER/pgs/simulations
@@ -286,7 +287,7 @@ fi
 
 # Check if samples match between LAI and target VCF
 run_logged "2_CHECK_LAI" Rscript "$BASE_DIR/Functions/02_check_target.R" \
-                        --chr $CHR --target-data $TARGET_DATA --target-lai $TARGET_LAI --out $OUTPUT_FOLDER || {
+                         --chr $CHR --target-data $TARGET_DATA --target-lai $TARGET_LAI --out $OUTPUT_FOLDER || {
     echo " ERROR: 2_CHECK_LAI failed at line $LINENO" | tee -a "$MAIN_LOG"
     exit 1
     }
@@ -393,6 +394,7 @@ REF_FILTERED="$OUTPUT_FOLDER/gen/ref_chr${CHR}_${PGS_ID}.vcf.gz"
 # If any of the output files do NOT exist, or if set to NOT resume pipeline, then run code
 if [[ ! -f "$TARGET_FILTERED"  || ! -f "$REF_FILTERED" ||  "$RESUME" == "false" ]]; then
     run_logged "6_FILTER_VARS" sh "$BASE_DIR/Functions/06_filter_data.sh" \
+                               --base-dir $BASE_DIR \
                                --target-data $TARGET_DATA --ref-data $REF_DATA \
                                --chr $CHR --pgs-id $PGS_ID \
                                --variant-list $OVERLAP_LIST --sample-list $SAMPLE_OVERLAP_LIST \
