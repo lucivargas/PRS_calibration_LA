@@ -43,11 +43,19 @@ done
 
 echo " Extracting variants from $GEN_DATA..."
 
-# Filter variants based on missingness (>90% of samples) and imputation quality (>90%)
+# Filter variants based on missingness (>90% of samples) and imputation quality (>90%) if it exists
 # Then, extract CHR, POS, REF and ALT 
 echo -e "CHROM\tPOS\tREF\tALT" > "$OUTPUT_FILE"
-bcftools view -i 'F_MISSING<0.9  && INFO>0.9' "$GEN_DATA" -Ou | \
-  bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n' | awk -v chr="$CHR" '$1 == chr || $1 == "chr"chr { sub(/^chr/, "", $1); print $1 "\t" $2 "\t" $3 "\t" $4 }' >> "$OUTPUT_FILE"
+if bcftools view -h "$GEN_DATA" | grep -q '^##INFO=<ID=R2'; then
+    echo "  R2 tag exists — applying imputation quality (>90%) filter..."
+    bcftools view -i 'F_MISSING<0.9  && INFO/R2>0.9' "$GEN_DATA" -Ou | \
+      bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n' | awk -v chr="$CHR" '$1 == chr || $1 == "chr"chr { sub(/^chr/, "", $1); print $1 "\t" $2 "\t" $3 "\t" $4 }' >> "$OUTPUT_FILE"
+else
+    echo "  R2 tag does NOT exist — skipping R2 filter"
+    bcftools view -i 'F_MISSING<0.9' "$GEN_DATA" -Ou | \
+      bcftools query -f '%CHROM\t%POS\t%REF\t%ALT\n' | awk -v chr="$CHR" '$1 == chr || $1 == "chr"chr { sub(/^chr/, "", $1); print $1 "\t" $2 "\t" $3 "\t" $4 }' >> "$OUTPUT_FILE"
+fi
+
 
 # Print message
 GEN_COUNT=$(($(wc -l < "$OUTPUT_FILE") - 1))
