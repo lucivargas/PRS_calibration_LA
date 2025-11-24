@@ -22,6 +22,7 @@ suppressPackageStartupMessages(library(foreach))
 # Parse named arguments
 parser <- ArgumentParser()
 parser$add_argument("--ref-data", required = TRUE, help = "Genetic data to apply PGS on")
+parser$add_argument("--ref-map", required = TRUE, help = "Map of ancestry codes for reference samples")
 parser$add_argument("--chr", required = TRUE, help = "Chromosome")
 parser$add_argument("--pgs-id", required = TRUE, help = "PGS ID")
 parser$add_argument("--pgs-path", required = TRUE, help = "Path to PGS scoring file")
@@ -33,6 +34,7 @@ args <- parser$parse_args()
 
 # Define variables
 REF_DATA <- args$ref_data
+REF_MAP <- args$ref_map
 CHR <- args$chr
 PGS_ID <- args$pgs_id
 PGS_PATH <- args$pgs_path
@@ -61,6 +63,10 @@ pgs <- read_tsv(PGS_PATH, comment="#", col_types="cccccccccccc")
 cat(" Importing genetic data...", sep="\n")
 gen <- fread(cmd=paste0("zcat ", REF_DATA," | grep -v '^##'"), sep = "\t", header = TRUE)
 gen_header <- names(gen)
+
+# Import reference map
+map <- read_tsv(REF_MAP, show_col_types = F) %>%
+  rename(Sample="#Sample")
 
 ###############
 ## Format data
@@ -182,8 +188,10 @@ haplo_matrix <- foreach(i = 1:nrow(gen), .combine='cbind', .packages=c("data.tab
     hap2 <- as.integer(gsub(".*\\|", "", unlist(genotypes)))
     
     # If risk allele is present, add weight 
-    hap1_vals <- ifelse(hap1 == risk_code, weight, 0)
-    hap2_vals <- ifelse(hap2 == risk_code, weight, 0)
+    # If the allele is missing, add an NA
+    # If alternative allele, add 0
+    hap1_vals <- ifelse(hap1 == risk_code, weight, ifelse(hap1 == ".", NA, 0))
+    hap2_vals <- ifelse(hap2 == risk_code, weight, ifelse(hap2 == ".", NA, 0))
     
   }
   
@@ -202,6 +210,51 @@ stopCluster(cl)
 haplo_matrix <- as.matrix(haplo_matrix)
 rownames(haplo_matrix) <- unlist(lapply(geno_cols, function(id) c(paste0(id, "_1"), paste0(id, "_2"))))
 colnames(haplo_matrix) <- gen$ID
+
+
+##########################
+## Impute missing weights
+##########################
+
+# If there's any missing data, impute it using the mean of each panel
+
+# Iterate panels
+panels <- unique(map$Panel)
+imputation_counter <- 0
+for(each_panel in panels){
+
+  # Identify subset of data in each panel
+  panel_ids <- map$Sample[map$Panel == each_panel]
+  panel_ids <- paste0(panel_ids, c("_1", "_2"))
+  index_panel <- row.names(haplo_matrix) %in% panel_ids
+    
+  # Iterate SNPs within data & impute
+  for(snp in 1:ncol(haplo_matrix)){
+    
+     # Identify missing data for that SNP within panel
+    index_missing <- which( is.na(haplo_matrix[[snp]]) & index_panel )
+    
+    # If there is missing data, proceed with imputation
+    if(length(index_missing) > 0){
+      
+      # Calculate the mean weight for that SNP within panel
+      mean_snp <- mean(haplo_matrix[index_panel, snp], na.rm = T)
+      
+      # Impute missing data using mean weights within panel
+      haplo_matrix[index_missing, snp] <- mean_snp
+      
+      # Update counter of data points imputed
+      imputation_counter <- imputation_counter + length(index_missing)
+    }
+    
+  }
+}
+
+cat(paste0(" ", imputation_counter, " missing values were imputed using mean weights for variant within each panel"), sep="\n")
+
+################
+## Save results
+################
 
 # Format & Save haplotype matrix 
 cat(paste0(" Saving results..."), sep="\n")
