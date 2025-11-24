@@ -540,8 +540,8 @@ export BASE_DIR SAMPLES TARGET_LAI LAI_CODES CHR \
        OUTPUT_FOLDER RESUME MAIN_LOG
 export -f match_lai 
 
-# Run STEP 9 for all target samples in parallel
-run_logged "9_MATCH_LAI"  parallel -j $THREADS match_lai ::: "${SAMPLES[@]:9000:9200}" || {
+# Run STEP 9 for 400 (200 EA and 200 AA) target samples in parallel
+run_logged "9_MATCH_LAI"  parallel -j $THREADS match_lai ::: "${SAMPLES[@]:1:200}" "${SAMPLES[@]:9000:9200}" || {
     echo "ERROR: 9_MATCH_LAI parallel step failed" 
     exit 1
 }
@@ -588,8 +588,8 @@ export BASE_DIR SAMPLES LAI_CODES CHR \
        OUTPUT_FOLDER RESUME MAIN_LOG
 export -f run_simulation 
 
-# Run STEP 10 for first 200 target samples in parallel
-run_logged "10_SIMULATION"  parallel --ungroup  -j $THREADS run_simulation ::: "${SAMPLES[@]:9000:9200}" || {
+# Run STEP 10 for 400 (200 EA and 200 AA) target samples in parallel
+run_logged "10_SIMULATION"  parallel --ungroup  -j $THREADS run_simulation ::: "${SAMPLES[@]:1:200}" "${SAMPLES[@]:9000:9200}" || {
     echo "ERROR: 10_SIMULATION parallel step failed"
     exit 1
 }
