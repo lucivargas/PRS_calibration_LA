@@ -413,25 +413,6 @@ fi
 
 
 ########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-# End pipeline here for testing
-exit 0
-########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-########################################
-
-########################################
 ## STEP 7: Apply PGS to reference data 
 ########################################
 
@@ -453,7 +434,7 @@ fi
 # If file does NOT exist, or if set to NOT resume pipeline, then run code
 if [[ ! -f "$PGS_REF"  || "$RESUME" == "false" ]]; then
     run_logged "7_SCORE_REF" Rscript "$BASE_DIR/Functions/07_apply_pgs_ref.R" \
-                            --ref-data $REF_FILTERED --chr $CHR \
+                            --ref-data $REF_FILTERED --ref-map $REF_MAP --chr $CHR \
                             --pgs-id $PGS_ID --pgs-path $PGS_PATH --variant-list $OVERLAP_LIST \
                             --out-file $PGS_REF --threads $THREADS --program-path $BASE_DIR || {
     echo " ERROR: 7_SCORE_REF failed at line $LINENO" | tee -a $MAIN_LOG
