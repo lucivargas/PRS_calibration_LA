@@ -7,10 +7,14 @@
 #######################
 
 # Load packages
-suppressPackageStartupMessages(library(argparse))
-suppressPackageStartupMessages(library(data.table))
-suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(boot))
+suppressWarnings({
+  suppressPackageStartupMessages({
+    library(argparse)
+    library(data.table)
+    library(tidyverse)
+    library(boot)
+  })
+})
 
 # Parse named arguments
 parser <- ArgumentParser()

@@ -13,11 +13,15 @@
 #######################
 
 # Load packages
-suppressPackageStartupMessages(library(argparse))
-suppressPackageStartupMessages(library(data.table))
-suppressPackageStartupMessages(library(tidyverse))
-suppressPackageStartupMessages(library(doParallel))
-suppressPackageStartupMessages(library(foreach))
+suppressWarnings({
+  suppressPackageStartupMessages({
+    library(argparse)
+    library(data.table)
+    library(tidyverse)
+    library(doParallel)
+    library(foreach)
+  })
+})
 
 # Parse named arguments
 parser <- ArgumentParser()
