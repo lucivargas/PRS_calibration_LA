@@ -8,9 +8,13 @@
 #######################
 
 # Load packages
-suppressPackageStartupMessages(library(argparse))
-suppressPackageStartupMessages(library(data.table))
-suppressPackageStartupMessages(library(tidyverse))
+suppressWarnings({
+  suppressPackageStartupMessages({
+    library(argparse)
+    library(data.table)
+    library(tidyverse)
+  })
+})
 
 # Parse named arguments
 parser <- ArgumentParser()

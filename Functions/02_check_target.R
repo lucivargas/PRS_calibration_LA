@@ -3,9 +3,13 @@
 # Date: 06/18/2025
 
 # Load packages
-suppressPackageStartupMessages(library(argparse))
-suppressPackageStartupMessages(library(stringr))
-suppressPackageStartupMessages(library(tidyverse))
+suppressWarnings({
+  suppressPackageStartupMessages({
+    library(argparse)
+    library(stringr)
+    library(tidyverse)
+  })
+})
 
 # Parse named arguments
 parser <- ArgumentParser()
