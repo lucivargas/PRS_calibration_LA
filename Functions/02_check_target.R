@@ -40,6 +40,7 @@ lai_codes <- readLines(TARGET_LAI, n=1)
 lai_codes <- gsub("\\#Subpopulation order\\/codes\\: ", "", lai_codes)
 
 # Split populations
+lai_codes <- gsub("\\\\t", "\t", lai_codes)
 lai_codes <- str_split(lai_codes, pattern="\t")[[1]]
 
 # Split each code by '=' and convert to data frame
