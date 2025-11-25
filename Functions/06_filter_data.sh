@@ -20,7 +20,7 @@ while [[ $# -gt 0 ]]; do
   key="$1"
   case $key in
     --base-dir)
-      $BASE_DIR="$2"
+      BASE_DIR="$2"
       shift 2
       ;;
     --target-data)
