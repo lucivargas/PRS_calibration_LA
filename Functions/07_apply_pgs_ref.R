@@ -157,7 +157,7 @@ print(cl)
 registerDoParallel(cl)
 
 # Perform SNP weighting using parallel processing
-haplo_matrix <- foreach(i = 1:nrow(gen), .combine='cbind', .packages=c("data.table")) %dopar% {
+haplo_matrix <- foreach(i = 1:nrow(gen), .combine='cbind', .packages=c("data.table", "tidyverse")) %dopar% {
   
   # Get alleles from PGS and data
   pgs_alleles <-  c(gen$effect_allele[i], gen$other_allele[i])
