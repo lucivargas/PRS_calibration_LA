@@ -41,6 +41,7 @@ source(paste0(BASE_DIR, "/Functions/utils.R"))
 
 ## Import PGS list
 pgs <- read_tsv(PGS_PATH, comment="#", col_types="cccccccccccc")
+if(!"other_allele" %in% names(pgs)){pgs$other_allele <- pgs$hm_inferOtherAllele}
 pgs <- pgs %>% 
   select(hm_chr, hm_pos, effect_allele, other_allele) %>%
   rename(chr="hm_chr", pos="hm_pos") %>%
