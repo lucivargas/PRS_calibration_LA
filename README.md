@@ -6,18 +6,18 @@
 
 # Dependencies
 
-The following GNU packages are required:
- bcftools<br>
- plink2<br>
- R<br>
- yq<br>
- parallel<br>
+The following GNU packages are required:<br>
+ - bcftools<br>
+ - plink2<br>
+ - R<br>
+ - yq<br>
+ - parallel<br>
 
-The following R packages are required:
- tidyverse<br>
- dplyr<br>
- argparse<br>
- stringr<br>
- doParallel<br>
- foreach<br>
- boot<br>
+The following R packages are required: <br>
+ - tidyverse<br>
+ - dplyr<br>
+ - argparse<br>
+ - stringr<br>
+ - doParallel<br>
+ - foreach<br>
+ - boot<br>
