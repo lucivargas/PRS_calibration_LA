@@ -25,7 +25,7 @@ suppressWarnings({
 
 # Parse named arguments
 parser <- ArgumentParser()
-parser$add_argument("--ref-data", required = TRUE, help = "Genetic data to apply PGS on")
+parser$add_argument("--ref-filtered", required = TRUE, help = "Genetic data to apply PGS on")
 parser$add_argument("--ref-map", required = TRUE, help = "Map of ancestry codes for reference samples")
 parser$add_argument("--chr", required = TRUE, help = "Chromosome")
 parser$add_argument("--pgs-id", required = TRUE, help = "PGS ID")
@@ -37,7 +37,7 @@ parser$add_argument("--program-path", required = TRUE, help = "Path to program")
 args <- parser$parse_args()
 
 # Define variables
-REF_DATA <- args$ref_data
+REF_FILTERED <- args$ref_filtered
 REF_MAP <- args$ref_map
 CHR <- args$chr
 PGS_ID <- args$pgs_id
@@ -65,7 +65,7 @@ pgs <- read_tsv(PGS_PATH, comment="#", col_types="cccccccccccc")
 
 ## Import and parse VCF
 cat(" Importing genetic data...", sep="\n")
-gen <- fread(cmd=paste0("zcat ", REF_DATA," | grep -v '^##'"), sep = "\t", header = TRUE)
+gen <- fread(cmd=paste0("zcat ", REF_FILTERED," | grep -v '^##'"), sep = "\t", header = TRUE)
 gen_header <- names(gen)
 
 # Import reference map
@@ -144,7 +144,8 @@ cat(paste0(" Applying ", PGS_ID, " to ", sample_count," samples in reference dat
 
 # Detect available cores
 detected_cores <- max(1, detectCores() - 1)
-n_cores <- ifelse(detected_cores < THREADS , detected_cores, THREADS)
+THREADS <- as.numeric(THREADS)
+n_cores <- min(THREADS, detected_cores)
 cat(paste0(" Using ", n_cores, " cores for parallelization with PSOCK clusters..."), sep="\n")
 
 # Define type of cluster to create
@@ -153,11 +154,13 @@ cat(paste0(" Using ", n_cores, " cores for parallelization with PSOCK clusters..
 
 # Register parallel backend
 cl <- makeCluster(as.numeric(n_cores), type = "PSOCK")
-print(cl)
+cl_info <- capture.output(print(cl))
+cat(paste0(" ", cl_info), sep="\n")
 registerDoParallel(cl)
 
 # Perform SNP weighting using parallel processing
-haplo_matrix <- foreach(i = 1:nrow(gen), .combine='cbind', .packages=c("data.table")) %dopar% {
+haplo_matrix <- foreach(i = 1:nrow(gen), .combine='cbind', 
+                        .packages=c("data.table", "dplyr")) %dopar% {
   
   # Get alleles from PGS and data
   pgs_alleles <-  c(gen$effect_allele[i], gen$other_allele[i])
@@ -254,7 +257,7 @@ for(each_panel in panels){
   }
 }
 
-cat(paste0(" ", imputation_counter, " missing values were imputed using mean weights for variant within each panel"), sep="\n")
+cat(paste0(" Imputation: ", imputation_counter, " missing values were imputed using mean weights for variant within each panel"), sep="\n")
 
 ################
 ## Save results

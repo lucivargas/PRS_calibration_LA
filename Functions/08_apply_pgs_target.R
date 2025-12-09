@@ -33,6 +33,7 @@ parser$add_argument("--variant-list", required = TRUE, help = "List of overlappi
 parser$add_argument("--out", required = TRUE, help = "Output folder")
 parser$add_argument("--out-file", required = TRUE, help = "Output file")
 parser$add_argument("--threads", required = TRUE, help = "Number of threads")
+parser$add_argument("--mem-mb", required = TRUE, help = "Memory available (in MB)")
 parser$add_argument("--program-path", required = TRUE, help = "Path to program")
 args <- parser$parse_args()
 
@@ -45,6 +46,7 @@ OVERLAP_LIST <- args$variant_list
 OUTPUT_FILE <- args$out_file
 OUTPUT_FOLDER <- args$out
 THREADS <- args$threads
+MEMORY <- args$mem_mb
 BASE_DIR <- args$program_path
 
 # Import pre-built functions
@@ -101,6 +103,14 @@ gen <- merge(gen, pgs, by = "POS")
 # Extract genotype columns from gen data
 geno_cols <- gen_header[10:length(gen_header)]
 
+# Export variant columns into new object
+info <- gen %>%
+  select(ID, REF, ALT, effect_allele, other_allele, effect_weight)
+
+# Convert all genotype columns to numeric type
+gen <- as.data.table(gen)
+gen[, (geno_cols) := lapply(.SD, as.numeric), .SDcols = geno_cols]
+
 
 ########################################
 ## Clean alternative alleles from data
@@ -138,18 +148,14 @@ if(length(duplicated_vars)>0){
 }
 
 
-####################################
-## Apply PGS in batches of samples
-####################################
+#############################################
+## Register parallelization & create batches
+#############################################
 
-# Start new results file with just the header
-pgs_header <- data.frame(matrix(ncol = 2, nrow = 0))
-colnames(pgs_header) <- c("Sample", paste0(PGS_ID,"_chr",CHR))
-write_tsv(pgs_header, file=OUTPUT_FILE, append = F)
-
-# Detect available cores
+# Detect number of available cores
 detected_cores <- max(1, detectCores() - 1)
-n_cores <- ifelse(detected_cores < THREADS , detected_cores, THREADS)
+THREADS <- as.numeric(THREADS)
+n_cores <- min(THREADS, detected_cores)
 cat(paste0(" Using ", n_cores, " cores for parallelization with PSOCK clusters..."), sep="\n")
 
 # Define type of cluster to create
@@ -158,17 +164,49 @@ cat(paste0(" Using ", n_cores, " cores for parallelization with PSOCK clusters..
 
 # Register parallel backend
 cl <- makeCluster(as.numeric(n_cores), type = "PSOCK")
-print(cl)
+cl_info <- capture.output(print(cl))
+cat(paste0(" ", cl_info), sep="\n")
 registerDoParallel(cl)
 
-# Create batches, including 1,000 samples at a time
+# Find the main R memory usage
+# pid <- Sys.getpid()
+# rss_bytes <- as.numeric(system(sprintf("ps -o rss= -p %d", pid), intern = TRUE)) * 1024
+# 
+# # Get total RAM available to our processes
+# safety_margin <- 0.7
+# MEMORY <- as.numeric(MEMORY)
+# MEMORY_bytes <- MEMORY * (1024^2)
+# total_ram_available <- ( MEMORY_bytes * safety_margin ) - rss_bytes
+# cat(paste0(" Total RAM available in the ", n_cores, " cores: ", 
+#            round(total_ram_available / (1024^3), digits=2), " GB"), sep="\n")
+# 
+# # Estimate batch size as a function of number of cores, data size and RAM needed to process our data
+# bytes_in_gen <- as.numeric(object.size(gen))
+# total_ram_available <- total_ram_available - bytes_in_gen
+# bytes_per_column <- bytes_in_gen / length(geno_cols)
+# bytes_per_column_incl_temp_objects <- bytes_per_column * 20  # accounts for memory used in temp objects when scoring
+# batch_size <- (total_ram_available * safety_margin ) / bytes_per_column_incl_temp_objects
+# batch_size <- floor(batch_size * safety_margin)
+batch_size <- 1000
+
+# Create batches 
 sample_count <- length(geno_cols) 
-batches <- data.frame(start=seq(from=1, to=sample_count, by=100),
-                      stringsAsFactors = F)
+batches <- data.frame(start=seq(from=1, to=sample_count, by=batch_size), stringsAsFactors = F)
 batches$end <- c(batches$start[-1] - 1,  sample_count)
+cat(paste0(" Data will be scored in ",nrow(batches)," batch(es) of ", batch_size, " samples."), sep="\n")
+
+
+####################################
+## Apply PGS in batches of samples
+####################################
 
 # Print message before start
 cat(paste0(" Applying ", PGS_ID, " to ", sample_count, " samples in target data..."), sep="\n")
+
+# Start new results file with just the header
+pgs_header <- data.frame(matrix(ncol = 2, nrow = 0))
+colnames(pgs_header) <- c("Sample", paste0(PGS_ID,"_chr",CHR))
+write_tsv(pgs_header, file=OUTPUT_FILE, append = F)
 
 # Create progress bar
 pb <- txtProgressBar(min = 0, max = nrow(batches), style = 3)
@@ -176,23 +214,18 @@ pb <- txtProgressBar(min = 0, max = nrow(batches), style = 3)
 # Apply PGS in each batch
 for(j in 1:nrow(batches)){
   
+  cat(paste0(" Processing batch ", j, "/", nrow(batches), "..."), sep="\n")
+  
   # Subset data
   index_start <- batches$start[j]
   index_end <- batches$end[j]
   batch_cols <- geno_cols[index_start:index_end]
-  gen_batch <- as.data.frame(gen[, batch_cols])
-  
-  # Export variant columns
-  info <- gen %>%
-    select(ID, REF, ALT, effect_allele, other_allele, effect_weight)
+  gen_batch <- gen[, batch_cols, drop = FALSE]
   
   # Perform SNP weighting using parallel processing
-  pgs_matrix <- foreach(i = 1:nrow(gen_batch), 
-                        .combine='cbind', # .export=c("info","reverse_complement"),
-                        .packages=c("data.table", "tidyverse")) %dopar% {
-                          
-    # Initialize object to save weights
-    mat <- matrix(NA, nrow = length(batch_cols), ncol = 1)                   
+  pgs_list <- foreach(i = 1:nrow(gen_batch), 
+                      .export = c("gen_batch", "batch_cols", "reverse_complement", "info"),
+                      .packages=c("data.table", "tidyverse", "dplyr")) %dopar% {
                           
     # Get alleles from PGS and data
     pgs_alleles <-  c(info$effect_allele[i], info$other_allele[i])
@@ -214,7 +247,7 @@ for(j in 1:nrow(batches)){
                         ifelse(risk == ref, 0, NA))
     
     # Get genotype dosages for all individuals
-    dosages <- as.numeric(gen_batch[i,])
+    dosages <- as.numeric(gen_batch[i, ])
     
     # Dosage in Minimac3: Posterior probability of the alternate allele at that site
     # Determine if ALT is risk allele, if not, flip dosage to reflect risk allele probability
@@ -226,26 +259,31 @@ for(j in 1:nrow(batches)){
     
     # Check if all alleles match 
     if(!all(pgs_alleles %in% data_alleles)){
-      cat(paste0("Error in calculating PGS on target data, SNP ID ", info$ID[i], ", alleles do not match between PGS and data"), 
-          file=paste0(OUTPUT_FOLDER,"/logs/error.log"), append=TRUE)
+      
+      # If not, return NA
+      cat(paste0(" Error in calculating PGS on target data for SNP ID ", info$ID[i], 
+                 ": alleles do not match between PGS (", paste(pgs_alleles, collapse = "/"),
+                 ") and data (", paste(data_alleles, collapse = "/"),
+                 ")"), sep = "\n")
+      vals <- NA
+      
     } else{
       
-      # Multiply dosage of risk allele by weight
+      # If so, multiply dosage of risk allele by weight
       vals <- dosage_aligned * weight
-      
-      # Add weighted values to batch matrix
-      mat[,1] <- vals
       
     }
     
     # Return scores
-    return(mat)
+    return(vals)
   }
   
+  # Bind the results into a matrix
+  pgs_matrix <- do.call(cbind, pgs_list)
+  
   # Assign SNP and haplotype IDs to batch matrix
-  pgs_matrix <- as.matrix(pgs_matrix)
   rownames(pgs_matrix) <- batch_cols
-  colnames(pgs_matrix) <- gen$ID
+  colnames(pgs_matrix) <- gen_batch$ID
   
   # Format & Save SNP-based PGS matrix
   pgs_matrix %>%

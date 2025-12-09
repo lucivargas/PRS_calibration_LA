@@ -12,7 +12,8 @@
 #     --genome-build GRCh38 \
 # 		--genome-dist genetic_map_hg38_withX.txt.gz \
 # 		--out /path/to/save/results \
-#     --threads 16
+#     --threads 16 \
+#     --mem-mb 30000
 
 
 #######################
@@ -68,6 +69,10 @@ while [[ $# -gt 0 ]]; do
       THREADS="$2"
       shift 2
       ;;
+    --mem-mb)
+      MEMORY="$2"
+      shift 2
+      ;;
     --resume)
       RESUME="$2"
       shift 2
@@ -84,7 +89,8 @@ while [[ $# -gt 0 ]]; do
       --genome-build GRCh38
       --genome-dist /path/to/gendist
       --out /path/to/output
-      --threads 16
+      --threads 8
+      --mem-mb 30
       --resume true"
       exit 1
       ;;
@@ -103,6 +109,11 @@ if [[ -z "${THREADS+x}" ]]; then
   THREADS=$(yq '.threads' $BASE_DIR/config.yml)
 fi
 
+# If not specified, get total memory across cores
+if [[ -z "${MEMORY+x}" ]]; then
+  MEMORY=$(yq '.mem' $BASE_DIR/config.yml)
+fi
+
 
 # Load values from config.yml
 NSIMULATIONS=$(yq '.nsimulations' $BASE_DIR/config.yml)
@@ -117,7 +128,7 @@ if [[ $NSIMULATIONS -lt 50 ]]; then
   echo "The number of simulations does not meet the minimum requiment of 50, please change config file." | tee -a $MAIN_LOG
   exit 1
 elif [[ $SIMSUM -lt 100 ]]; then
-  echo "The number of simulations and bootstraps does sum to 100, the minimum requiment for percentile calculation, please change config file." |  tee -a $MAIN_LOG
+  echo "The number of simulations and bootstraps does not sum to 100, the minimum requiment for percentile calculation, please change config file." |  tee -a $MAIN_LOG
   exit 1
 fi  
 
@@ -233,6 +244,7 @@ echo "Options in effect:
       --genome-dist $GENOME_DIST
       --out $OUTPUT_FOLDER
       --threads $THREADS
+      --mem-mb $MEMORY
       --resume $RESUME" | tee -a $MAIN_LOG
 
 
@@ -434,7 +446,7 @@ fi
 # If file does NOT exist, or if set to NOT resume pipeline, then run code
 if [[ ! -f "$PGS_REF"  || "$RESUME" == "false" ]]; then
     run_logged "7_SCORE_REF" Rscript "$BASE_DIR/Functions/07_apply_pgs_ref.R" \
-                            --ref-data $REF_FILTERED --ref-map $REF_MAP --chr $CHR \
+                            --ref-filtered $REF_FILTERED --ref-map $REF_MAP --chr $CHR \
                             --pgs-id $PGS_ID --pgs-path $PGS_PATH --variant-list $OVERLAP_LIST \
                             --out-file $PGS_REF --threads $THREADS --program-path $BASE_DIR || {
     echo " ERROR: 7_SCORE_REF failed at line $LINENO" | tee -a $MAIN_LOG
@@ -473,7 +485,8 @@ if [[ ! -f "$PGS_TARGET"  || "$RESUME" == "false" ]]; then
   run_logged "8_SCORE_TARGET" Rscript "$BASE_DIR/Functions/08_apply_pgs_target.R" \
                               --gen-data $TARGET_FILTERED --chr $CHR \
                               --pgs-id $PGS_ID --pgs-path $PGS_PATH --variant-list $OVERLAP_LIST \
-                              --out-file $PGS_TARGET --out $OUTPUT_FOLDER --threads $THREADS \
+                              --out-file $PGS_TARGET --out $OUTPUT_FOLDER \
+                              --threads $THREADS --mem-mb $MEMORY \
                               --program-path $BASE_DIR || {
     echo " ERROR: 8_SCORE_TARGET failed at line $LINENO" | tee -a $MAIN_LOG
     exit 1
