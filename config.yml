@@ -2,6 +2,7 @@ base_dir: "/scratch/alpine/ldebritovargas@xsede.org/PRS_calibration_LA/"
 genome-dist: "/scratch/alpine/ldebritovargas@xsede.org/PRS_calibration_LA/resources/genetic_map_hg38_withX.txt.gz"
 output_dir: "/scratch/alpine/ldebritovargas@xsede.org/PRS_calibration_LA/"
 threads: 8
+mem: 30000
 min_overlap: 0.9
 nsimulations: 200
 nbootstraps: 200

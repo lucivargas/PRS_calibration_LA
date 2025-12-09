@@ -11,9 +11,6 @@
 *.err
 
 # Ignore other scripts
-create_conda_environment.sh
-prscal_environment.yml
-prep_for_calibration.R
 join_calibration_results.R
 run_calibrate.sh
 
@@ -23,3 +20,6 @@ run_calibrate.sh
 3_infer_local_ancestry/
 4_format_target_imputed/
 validations/
+other_Functions/
+
+

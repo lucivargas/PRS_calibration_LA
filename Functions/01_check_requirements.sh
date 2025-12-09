@@ -38,6 +38,7 @@ check_r_package stringr
 check_r_package doParallel
 check_r_package foreach
 check_r_package boot
+check_r_package dplyr
 
 if [ "$MISSING" -ne 0 ]; then
     echo "❌ One or more required tools/packages are missing. Check details in log." 
